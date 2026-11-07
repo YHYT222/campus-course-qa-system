@@ -1,54 +1,25 @@
 package com.campus.qa.entity;
 
-import java.util.Date;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.time.LocalDateTime;
 
 /**
- * 收藏实体类 —— 对应补充表 t_favorite（支撑需求 4.1.3 收藏功能）
+ * 收藏表
  */
+@Data
+@TableName("favorite")
 public class Favorite {
 
-    /** 主键ID */
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    /** 收藏用户id */
     private Long userId;
 
-    /** 被收藏帖子id */
     private Long postId;
 
-    /** 收藏时间 */
-    private Date createTime;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
-
-    public Long getPostId() {
-        return postId;
-    }
-
-    public void setPostId(Long postId) {
-        this.postId = postId;
-    }
-
-    public Date getCreateTime() {
-        return createTime;
-    }
-
-    public void setCreateTime(Date createTime) {
-        this.createTime = createTime;
-    }
-
+    private LocalDateTime createTime;
 }
