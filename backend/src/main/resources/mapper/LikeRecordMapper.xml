@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.qa.mapper.LikeRecordMapper">
+
+    <select id="selectByUserAndPost" resultType="com.campus.qa.entity.LikeRecord">
+        SELECT id, user_id, post_id, create_time
+        FROM t_like_record
+        WHERE user_id = #{userId} AND post_id = #{postId} LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.campus.qa.entity.LikeRecord" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO t_like_record (user_id, post_id, create_time)
+        VALUES (#{userId}, #{postId}, NOW())
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM t_like_record WHERE user_id = #{userId} AND post_id = #{postId}
+    </delete>
+
+    <delete id="deleteByPostId">
+        DELETE FROM t_like_record WHERE post_id = #{postId}
+    </delete>
+</mapper>

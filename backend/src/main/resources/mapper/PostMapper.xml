@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.qa.mapper.PostMapper">
+
+    <!-- 帖子 VO 通用结果映射：关联作者、课程，并统计评论数 -->
+    <sql id="vo_select">
+        SELECT p.id, p.user_id, p.category_id, p.content, p.image, p.like_count,
+               p.create_time, p.status,
+               u.username AS author_name,
+               u.avatar   AS author_avatar,
+               c.name     AS category_name,
+               (SELECT COUNT(*) FROM t_comment cm WHERE cm.post_id = p.id) AS comment_count
+        FROM t_post p
+        LEFT JOIN t_user u      ON p.user_id = u.id
+        LEFT JOIN t_category c  ON p.category_id = c.id
+    </sql>
+
+    <resultMap id="PostVOMap" type="com.campus.qa.dto.PostVO">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="category_id" property="categoryId"/>
+        <result column="content" property="content"/>
+        <result column="image" property="image"/>
+        <result column="like_count" property="likeCount"/>
+        <result column="create_time" property="createTime"/>
+        <result column="status" property="status"/>
+        <result column="author_name" property="authorName"/>
+        <result column="author_avatar" property="authorAvatar"/>
+        <result column="category_name" property="categoryName"/>
+        <result column="comment_count" property="commentCount"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.campus.qa.entity.Post" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO t_post (user_id, category_id, content, image, like_count, create_time, status)
+        VALUES (#{userId}, #{categoryId}, #{content}, #{image}, 0, NOW(), 0)
+    </insert>
+
+    <select id="selectById" resultType="com.campus.qa.entity.Post">
+        SELECT id, user_id, category_id, content, image, like_count, create_time, status
+        FROM t_post WHERE id = #{id}
+    </select>
+
+    <select id="selectVOById" resultMap="PostVOMap">
+        <include refid="vo_select"/> WHERE p.id = #{id}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE t_post SET status = #{status} WHERE id = #{id}
+    </update>
+
+    <update id="incrLikeCount">
+        UPDATE t_post SET like_count = like_count + 1 WHERE id = #{id}
+    </update>
+
+    <update id="decrLikeCount">
+        UPDATE t_post SET like_count = CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM t_post WHERE id = #{id}
+    </delete>
+
+    <select id="selectApprovedPage" resultMap="PostVOMap">
+        <include refid="vo_select"/>
+        WHERE p.status = 1
+        <if test="categoryId != null">
+            AND p.category_id = #{categoryId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND p.content LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        ORDER BY p.create_time DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countApproved" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM t_post p
+        WHERE p.status = 1
+        <if test="categoryId != null">
+            AND p.category_id = #{categoryId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND p.content LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+    </select>
+
+    <select id="selectByUserId" resultMap="PostVOMap">
+        <include refid="vo_select"/>
+        WHERE p.user_id = #{userId}
+        ORDER BY p.create_time DESC
+    </select>
+
+    <select id="selectFavorites" resultMap="PostVOMap">
+        <include refid="vo_select"/>
+        INNER JOIN t_favorite f ON f.post_id = p.id
+        WHERE f.user_id = #{userId}
+        ORDER BY f.create_time DESC
+    </select>
+
+    <select id="selectAdminPage" resultMap="PostVOMap">
+        <include refid="vo_select"/>
+        <where>
+            <if test="status != null">
+                AND p.status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (p.content LIKE CONCAT('%', #{keyword}, '%')
+                     OR u.username LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY p.create_time DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countAdmin" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM t_post p
+        LEFT JOIN t_user u ON p.user_id = u.id
+        <where>
+            <if test="status != null">
+                AND p.status = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (p.content LIKE CONCAT('%', #{keyword}, '%')
+                     OR u.username LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </select>
+
+    <select id="countByStatus" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM t_post
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <!-- 各课程分类提问数量统计（柱状图）：只统计已通过审核的帖子 -->
+    <select id="categoryStat" resultType="java.util.Map">
+        SELECT c.name                        AS name,
+               COUNT(p.id)                    AS value
+        FROM t_category c
+        LEFT JOIN t_post p ON c.id = p.category_id AND p.status = 1
+        GROUP BY c.id, c.name
+        ORDER BY value DESC, c.id ASC
+    </select>
+
+    <!-- 近 N 日平台答疑活跃度统计（折线图）：帖子数与评论数按天汇总 -->
+    <select id="activityStat" resultType="java.util.Map">
+        SELECT t.day AS day, SUM(t.cnt) AS value
+        FROM (
+            SELECT DATE(create_time) AS day, COUNT(*) AS cnt FROM t_post    GROUP BY DATE(create_time)
+            UNION ALL
+            SELECT DATE(create_time) AS day, COUNT(*) AS cnt FROM t_comment GROUP BY DATE(create_time)
+        ) t
+        WHERE DATEDIFF(CURDATE(), t.day) &lt; #{days}
+        GROUP BY t.day
+        ORDER BY t.day ASC
+    </select>
+
+</mapper>
