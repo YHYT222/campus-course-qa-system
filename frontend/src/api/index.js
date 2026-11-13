@@ -23,6 +23,7 @@ export const getMyFavorites = () => request.get('/interact/favorites')
 export const addReply = data => request.post('/interact/reply', data)
 export const getReplies = postId => request.get(`/interact/replies/${postId}`)
 export const getMyReplies = () => request.get('/interact/my-replies')
+export const deleteReply = id => request.delete(`/interact/reply/${id}`)
 
 // ==================== 管理端 ====================
 export const addCourse = data => request.post('/admin/course', data)
