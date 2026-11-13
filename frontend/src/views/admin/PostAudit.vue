@@ -1,44 +1,73 @@
 <template>
-  <div class="admin-panel">
-    <div class="panel-header">
-      <h3>帖子审核</h3>
-      <el-input v-model="keyword" placeholder="搜索标题 / 发布人" clearable style="width: 240px"
+  <div class="panel">
+    <div class="panel-head">
+      <div class="ph-text">
+        <h3>帖子审核</h3>
+        <p>学生发布的帖子先进入待审核队列，通过后才会在前台公开展示</p>
+      </div>
+      <el-input v-model="keyword" class="search" placeholder="搜索标题 / 发布人" clearable
                 @keyup.enter="load(1)" @clear="load(1)">
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
         <template #append>
-          <el-button :icon="Search" @click="load(1)" />
+          <el-button @click="load(1)">搜索</el-button>
         </template>
       </el-input>
     </div>
 
-    <el-tabs v-model="statusTab" @tab-change="load(1)">
-      <el-tab-pane label="全部" name="all" />
-      <el-tab-pane label="已发布" name="1" />
-      <el-tab-pane label="已屏蔽" name="2" />
-    </el-tabs>
+    <div class="panel-tabs">
+      <el-tabs v-model="statusTab" @tab-change="load(1)">
+        <el-tab-pane label="待审核" name="0" />
+        <el-tab-pane label="已发布" name="1" />
+        <el-tab-pane label="已屏蔽" name="2" />
+        <el-tab-pane label="全部" name="all" />
+      </el-tabs>
+    </div>
 
-    <el-table :data="list" v-loading="loading" stripe>
-      <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="title" label="问题标题" min-width="220" show-overflow-tooltip />
-      <el-table-column prop="authorName" label="发布人" width="110" />
-      <el-table-column prop="courseName" label="课程" width="110">
+    <el-table :data="list" v-loading="loading" class="soft-table">
+      <el-table-column prop="id" label="ID" width="70">
         <template #default="{ row }">
-          <el-tag size="small" effect="plain">{{ row.courseName }}</el-tag>
+          <span class="id-cell">#{{ row.id }}</span>
         </template>
       </el-table-column>
+
+      <el-table-column label="问题标题" min-width="230">
+        <template #default="{ row }">
+          <div class="title-cell" :title="row.title" @click="view(row)">{{ row.title }}</div>
+        </template>
+      </el-table-column>
+
+      <el-table-column prop="authorName" label="发布人" width="110" />
+
+      <el-table-column label="课程" width="120">
+        <template #default="{ row }">
+          <span class="course-chip">{{ row.courseName }}</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
-          <el-tag size="small" :type="statusType(row.status)">{{ statusText(row.status) }}</el-tag>
+          <span class="status-dot" :class="'s' + row.status">
+            <i></i>{{ statusText(row.status) }}
+          </span>
         </template>
       </el-table-column>
-      <el-table-column label="发布时间" width="170">
-        <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
+
+      <el-table-column label="发布时间" width="156">
         <template #default="{ row }">
-          <el-button size="small" @click="view(row)">查看</el-button>
-          <el-button v-if="row.status !== 1" size="small" type="success" plain @click="audit(row, 1)">发布</el-button>
-          <el-button v-if="row.status !== 2" size="small" type="warning" plain @click="audit(row, 2)">屏蔽</el-button>
-          <el-button size="small" type="danger" plain @click="doDelete(row)">删除</el-button>
+          <span class="time-cell">{{ formatTime(row.createTime) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="操作" width="252" fixed="right">
+        <template #default="{ row }">
+          <div class="row-actions">
+            <button class="mini-btn" @click="view(row)">查看</button>
+            <button v-if="row.status !== 1" class="mini-btn ok" @click="audit(row, 1)">通过</button>
+            <button v-if="row.status !== 2" class="mini-btn warn" @click="audit(row, 2)">屏蔽</button>
+            <button class="mini-btn danger" @click="doDelete(row)">删除</button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -48,19 +77,26 @@
                      :page-size="query.size" :current-page="query.page" @current-change="onPage" />
     </div>
 
-    <!-- 内容查看对话框 -->
-    <el-dialog v-model="viewVisible" :title="viewing?.title" width="640px">
-      <div class="view-meta">
-        <el-tag size="small" effect="plain">{{ viewing?.courseName }}</el-tag>
-        <span class="muted">发布人：{{ viewing?.authorName }} · {{ formatTime(viewing?.createTime) }}</span>
-      </div>
+    <!-- 查看对话框 -->
+    <el-dialog v-model="viewVisible" width="660px" class="view-dialog">
+      <template #header>
+        <div class="dlg-head">
+          <span class="course-chip">{{ viewing?.courseName }}</span>
+          <span class="dlg-meta">{{ viewing?.authorName }} · {{ formatTime(viewing?.createTime) }}</span>
+        </div>
+      </template>
+
+      <h3 class="dlg-title">{{ viewing?.title }}</h3>
       <div class="view-content">{{ viewing?.content }}</div>
-      <el-image v-if="viewing?.image" :src="viewing.image" fit="cover" style="max-width: 100%; border-radius: 8px; margin-top: 12px"
+      <el-image v-if="viewing?.image" :src="viewing.image" fit="cover" class="view-image"
                 :preview-src-list="[viewing.image]" hide-on-click-modal />
+
       <template #footer>
-        <el-button v-if="viewing?.status !== 1" type="success" @click="audit(viewing, 1); viewVisible = false">通过发布</el-button>
-        <el-button v-if="viewing?.status !== 2" type="warning" @click="audit(viewing, 2); viewVisible = false">屏蔽帖子</el-button>
         <el-button @click="viewVisible = false">关闭</el-button>
+        <el-button v-if="viewing?.status !== 2" type="warning" plain
+                   @click="audit(viewing, 2); viewVisible = false">屏蔽帖子</el-button>
+        <el-button v-if="viewing?.status !== 1" type="primary"
+                   @click="audit(viewing, 1); viewVisible = false">通过并发布</el-button>
       </template>
     </el-dialog>
   </div>
@@ -76,14 +112,14 @@ const list = ref([])
 const total = ref(0)
 const loading = ref(false)
 const keyword = ref('')
-const statusTab = ref('all')
+// 默认停在「待审核」，管理员进入后直接处理积压队列
+const statusTab = ref('0')
 const viewVisible = ref(false)
 const viewing = ref(null)
 
 const query = reactive({ page: 1, size: 10 })
 
 const statusText = s => ({ 0: '待审核', 1: '已发布', 2: '已屏蔽' })[s] || '未知'
-const statusType = s => ({ 0: 'info', 1: 'success', 2: 'danger' })[s] || 'info'
 const formatTime = t => (t || '').replace('T', ' ').slice(0, 16)
 
 const load = async (page = query.page) => {
@@ -112,7 +148,7 @@ const view = row => {
 
 const audit = async (row, status) => {
   await auditPost(row.id, status)
-  ElMessage.success(status === 1 ? '已发布' : '已屏蔽')
+  ElMessage.success(status === 1 ? '已通过并发布' : '已屏蔽')
   viewVisible.value = false
   load()
 }
@@ -130,43 +166,252 @@ onMounted(() => load(1))
 </script>
 
 <style scoped>
-.admin-panel {
+.panel {
   background: #fff;
-  border-radius: 10px;
-  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 24px 26px 18px;
+  box-shadow: var(--shadow-xs);
+  animation: fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.panel-header {
+.panel-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 10px;
+  gap: 20px;
+  margin-bottom: 8px;
 }
 
-.panel-header h3 {
-  color: #1a365d;
+.ph-text h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink-900);
+  letter-spacing: -0.3px;
+}
+
+.ph-text p {
+  margin-top: 5px;
+  font-size: 12.5px;
+  color: var(--ink-400);
+}
+
+.search {
+  width: 270px;
+  flex: none;
+}
+
+.search :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  padding-left: 12px;
+  background: #fafbff;
+}
+
+.search :deep(.el-input-group__append) {
+  border-radius: 0 10px 10px 0;
+  background: var(--brand-500);
+  border: none;
+  color: #fff;
+  box-shadow: none;
+}
+
+.search :deep(.el-input-group__append .el-button) {
+  color: #fff;
+  font-weight: 500;
+}
+
+.panel-tabs {
+  margin: 6px 0 4px;
+}
+
+.panel-tabs :deep(.el-tabs__header) {
+  margin-bottom: 12px;
+}
+
+.panel-tabs :deep(.el-tabs__item) {
+  height: 40px;
+  font-size: 14px;
+  padding: 0 4px;
+  margin-right: 26px;
+}
+
+.soft-table {
+  --el-table-border-color: transparent;
+  border-radius: var(--r-md);
+}
+
+.id-cell {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--ink-300);
+}
+
+.title-cell {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-800);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.18s;
+}
+
+.title-cell:hover {
+  color: var(--brand-600);
+}
+
+.course-chip {
+  display: inline-flex;
+  padding: 1px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--brand-600);
+  background: var(--brand-50);
+}
+
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+
+.status-dot i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.status-dot.s0 {
+  color: #c07c00;
+}
+
+.status-dot.s0 i {
+  background: #ffab2e;
+  box-shadow: 0 0 0 3px rgba(255, 171, 46, 0.18);
+}
+
+.status-dot.s1 {
+  color: #12977f;
+}
+
+.status-dot.s1 i {
+  background: #22c08a;
+  box-shadow: 0 0 0 3px rgba(34, 192, 138, 0.16);
+}
+
+.status-dot.s2 {
+  color: #d64357;
+}
+
+.status-dot.s2 i {
+  background: #ef5468;
+  box-shadow: 0 0 0 3px rgba(239, 84, 104, 0.16);
+}
+
+.time-cell {
+  font-size: 12.5px;
+  color: var(--ink-400);
+}
+
+.row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.mini-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--ink-500);
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+  flex: none;
+}
+
+.mini-btn:hover {
+  border-color: var(--brand-200);
+  color: var(--brand-600);
+  background: #fbfcff;
+}
+
+.mini-btn.ok {
+  color: #12977f;
+  border-color: #c9f0e5;
+  background: #f4fdfa;
+}
+
+.mini-btn.ok:hover {
+  background: #e8fbf5;
+  border-color: #9fe6d4;
+}
+
+.mini-btn.warn {
+  color: #c07c00;
+  border-color: #ffe4b8;
+  background: #fffbf3;
+}
+
+.mini-btn.warn:hover {
+  background: #fff5e3;
+  border-color: #ffd28c;
+}
+
+.mini-btn.danger {
+  color: #d64357;
+}
+
+.mini-btn.danger:hover {
+  background: #fff5f6;
+  border-color: #ffd0d7;
+  color: #d64357;
 }
 
 .pager {
   display: flex;
   justify-content: center;
-  margin-top: 16px;
+  margin-top: 18px;
 }
 
-.view-meta {
+/* 对话框 */
+.dlg-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+.dlg-meta {
+  font-size: 12.5px;
+  color: var(--ink-400);
+}
+
+.dlg-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink-900);
+  line-height: 1.5;
   margin-bottom: 12px;
 }
 
 .view-content {
   font-size: 14px;
-  line-height: 1.8;
-  color: #2d3748;
+  line-height: 1.9;
+  color: var(--ink-700);
   white-space: pre-wrap;
-  background: #f7fafc;
-  padding: 14px;
-  border-radius: 8px;
+  background: #fafbff;
+  border: 1px solid var(--line-soft);
+  padding: 16px 18px;
+  border-radius: var(--r-md);
+}
+
+.view-image {
+  margin-top: 12px;
+  max-width: 100%;
+  border-radius: var(--r-md);
 }
 </style>

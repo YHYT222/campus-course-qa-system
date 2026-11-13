@@ -56,7 +56,7 @@ CREATE TABLE `post` (
   `content`     TEXT         NOT NULL COMMENT '问题内容',
   `image`       VARCHAR(255) DEFAULT NULL COMMENT '配图URL',
   `like_count`  INT          NOT NULL DEFAULT 0 COMMENT '点赞数',
-  `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '审核状态 0待审核 1已发布 2已屏蔽',
+  `status`      TINYINT      NOT NULL DEFAULT 0 COMMENT '审核状态 0待审核 1已发布 2已屏蔽',
   `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间',
   PRIMARY KEY (`id`),
   KEY `idx_course_id` (`course_id`),
